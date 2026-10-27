@@ -12,8 +12,10 @@
    python3 classify.py --input comments-v2.json
    ```
 
-3. Open `report-comments.html` in a browser. Filter by label, click "Needs a look" to see
+3. Open `report-comments.html` in Chrome. Filter by label, click "Needs a look" to see
    low-confidence answers (< 0.5) and model disagreements, or sort by lowest confidence.
+4. To record a mistake, click "Clef is wrong" on a comment, pick the right label, mark it
+   borderline if needed and write why. "Save MISTAKES.md" writes all marked comments to the file.
 
 API answers are cached in `results/`, so re-running only rebuilds the HTML. `--refresh` calls the API again.
 
@@ -22,10 +24,17 @@ API answers are cached in `results/`, so re-running only rebuilds the HTML. `--r
 - Cloudflare Workers AI, `@cf/cloudflare/clef` (main labels) and `clef-flash` (comparison).
 - Each comment is sent with its `thread` and the forum title as context, plus one choice
   question describing acceptable / toxic / spam (see `CRITERIA` in `classify.py`).
-- <!-- TODO: which AI assistant(s) you used to write the code, e.g. Claude -->
-- `MISTAKES.md` was written by me after reading all 100 comments; no AI was used for it.
+- Claude (in the Chrome side panel) wrote `classify.py`, the HTML report and its
+  "Clef is wrong" buttons, and set up the GitHub repo.
+- `MISTAKES.md` is my own judgement: I read the comments and Clef's labels and wrote every
+  label and reason myself. The report's buttons only save what I type.
 
 ## What I thought
 
-<!-- TODO: 3–5 lines in your own words: what surprised you about Clef's mistakes,
-     which kinds of comments were hardest to call, what you'd change in the criteria. -->
+- Getting Clef running was quick; most of my time went into a 401 error, which turned out
+  to be a wrong token value in `cloud-flare.local.sh`, not the code.
+- The two mistakes I found are both comments that stereotype a whole group (a hostel side,
+  a branch) without insulting one named person. Clef called both acceptable with very low
+  confidence (0.22), so the confidence score was a useful pointer to what needed a human look.
+- Next I would add "stereotyping or mocking a group (branch, hostel, region)" explicitly
+  to the toxic criteria and re-run to see whether Clef catches these.
