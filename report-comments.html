@@ -1,0 +1,2697 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clef moderation report</title><style>
+:root { --bg:#f7f7f5; --card:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e3e3e0;
+  --acceptable:#1f7a4d; --acceptable-bg:#e3f4ea; --toxic:#b3261e; --toxic-bg:#fbe4e2;
+  --spam:#9a5b00; --spam-bg:#fdf0d8; --flag:#5b3cc4; }
+@media (prefers-color-scheme: dark) { :root { --bg:#151517; --card:#1f1f22; --ink:#ececee;
+  --muted:#a0a0a8; --line:#33333a; --acceptable:#6fd39e; --acceptable-bg:#173a28;
+  --toxic:#ff8a80; --toxic-bg:#47201e; --spam:#f3c26b; --spam-bg:#3d2e12; --flag:#b9a6ff; } }
+* { box-sizing:border-box; }
+body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  background:var(--bg); color:var(--ink); }
+header { position:sticky; top:0; background:var(--bg); border-bottom:1px solid var(--line);
+  padding:14px 20px; z-index:1; }
+h1 { font-size:18px; margin:0 0 4px; }
+.sub { color:var(--muted); font-size:13px; }
+.bar { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:center; }
+.bar button { border:1px solid var(--line); background:var(--card); color:var(--ink);
+  border-radius:999px; padding:4px 12px; cursor:pointer; font-size:13px; }
+.bar button.on { border-color:var(--ink); font-weight:600; }
+.bar input, .bar select { border:1px solid var(--line); background:var(--card); color:var(--ink);
+  border-radius:8px; padding:5px 10px; font-size:13px; }
+main { max-width:980px; margin:0 auto; padding:16px 20px 60px; }
+.row { display:grid; grid-template-columns:48px 110px 1fr; gap:12px; background:var(--card);
+  border:1px solid var(--line); border-left:5px solid var(--line); border-radius:8px;
+  padding:10px 14px; margin-bottom:8px; }
+.row.acceptable { border-left-color:var(--acceptable); }
+.row.toxic { border-left-color:var(--toxic); }
+.row.spam { border-left-color:var(--spam); }
+.id { font-weight:700; color:var(--muted); font-variant-numeric:tabular-nums; }
+.badge { display:inline-block; font-size:12px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.03em; padding:2px 8px; border-radius:6px; }
+.badge.acceptable { color:var(--acceptable); background:var(--acceptable-bg); }
+.badge.toxic { color:var(--toxic); background:var(--toxic-bg); }
+.badge.spam { color:var(--spam); background:var(--spam-bg); }
+.conf { font-size:12px; color:var(--muted); margin-top:4px; font-variant-numeric:tabular-nums; }
+.conf.low { color:var(--flag); font-weight:700; }
+.text { white-space:pre-wrap; word-break:break-word; }
+.meta { font-size:12px; color:var(--muted); margin-top:4px; }
+.probs { display:flex; height:6px; border-radius:3px; overflow:hidden; margin-top:6px;
+  background:var(--line); max-width:320px; }
+.probs span.acceptable { background:var(--acceptable); }
+.probs span.toxic { background:var(--toxic); }
+.probs span.spam { background:var(--spam); }
+.other { font-size:12px; margin-top:4px; }
+.other.disagree { color:var(--flag); font-weight:700; }
+.row.marked { outline:2px dashed var(--flag); outline-offset:-2px; }
+.mark-btn { margin-top:8px; border:1px solid var(--line); background:transparent; color:var(--ink);
+  border-radius:6px; padding:3px 10px; font-size:12px; cursor:pointer; }
+.row.marked .mark-btn { border-color:var(--flag); color:var(--flag); font-weight:700; }
+.editor { display:none; margin-top:8px; padding:10px; border:1px solid var(--line); border-radius:8px; }
+.editor.open { display:block; }
+.editor label { font-size:13px; margin-right:12px; }
+.editor select, .editor textarea { background:var(--bg); color:var(--ink); border:1px solid var(--line);
+  border-radius:6px; padding:4px 8px; font:inherit; font-size:13px; }
+.editor textarea { width:100%; min-height:60px; margin-top:8px; }
+.editor .actions { margin-top:8px; display:flex; gap:8px; }
+.editor .actions button { border:1px solid var(--line); background:var(--card); color:var(--ink);
+  border-radius:6px; padding:4px 12px; cursor:pointer; font-size:13px; }
+.editor .actions button.primary { background:var(--flag); color:#fff; border-color:var(--flag); }
+#save-status { font-size:12px; color:var(--muted); }
+@media (max-width:640px) { .row { grid-template-columns:40px 1fr; }
+  .row .text-cell { grid-column:1 / -1; } }
+</style></head>
+<body data-model="clef" data-source="comments.json">
+<header>
+  <h1>Clef moderation — Assignment 3: Build an AI artifact with Claude / Codex</h1>
+  <div class="sub">CS307 Applied AI Lab (B.Tech CSE, 3rd year) · model <b>clef</b> · 100 comments · 74 acceptable · 12 toxic · 14 spam · 7 flagged for review (confidence &lt; 0.5 or clef and clef-flash disagree)</div>
+  <div class="bar">
+    <button data-filter="all" class="on">All</button>
+    <button data-filter="acceptable">Acceptable (74)</button>
+    <button data-filter="toxic">Toxic (12)</button>
+    <button data-filter="spam">Spam (14)</button>
+    <button id="flag">⚑ Needs a look (7)</button>
+    <select id="sort"><option value="id">Sort by id</option><option value="conf">Lowest confidence first</option></select>
+    <input id="q" placeholder="Search text…">
+    <span class="sub" id="count"></span>
+  </div>
+  <div class="bar">
+    <button id="marked">✗ Marked by me (0)</button>
+    <button id="save-md">💾 Save MISTAKES.md</button>
+    <span id="save-status">Pick MISTAKES.md in your repo folder once; after that every change auto-saves.</span>
+  </div>
+</header>
+<main>
+<div class="row acceptable" data-id="1" data-label="acceptable" data-conf="0.9085" data-flag="0">
+  <div class="id">#1</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.91</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Ma&#x27;am, is it okay if we use Claude for the frontend and Codex for the backend logic, or should the whole artifact be built with one tool?</div>
+    <div class="meta">Aditya Kulkarni · Doubts · 2026-10-12 09:14 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:96.9%" title="acceptable 96.9%"></span><span class="toxic" style="width:1.7%" title="toxic 1.7%"></span><span class="spam" style="width:1.5%" title="spam 1.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.62)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="2" data-label="acceptable" data-conf="0.8421" data-flag="0">
+  <div class="id">#2</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.84</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Submitted my artifact: a timetable clash checker for our dept. Claude made the UI in like 10 mins but I spent 2 hours fixing the CSV parsing. Link is in my submission.</div>
+    <div class="meta">Sneha Iyer · Share your artifacts · 2026-10-12 10:02 · A 0.95 · T 0.02 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:94.5%" title="acceptable 94.5%"></span><span class="toxic" style="width:2.2%" title="toxic 2.2%"></span><span class="spam" style="width:3.2%" title="spam 3.2%"></span></div>
+    <div class="other">clef-flash: acceptable (0.43)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="3" data-label="spam" data-conf="0.9397" data-flag="0">
+  <div class="id">#3</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.94</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">🔥🔥 GET YOUR ASSIGNMENTS DONE BY EXPERTS 🔥🔥 Claude/Codex/ML projects, plagiarism free, 100% marks guaranteed. WhatsApp +91 90000 12345. Special discount for CS307 students!!</div>
+    <div class="meta">AssignmentGuru_99 · General · 2026-10-12 10:40 · A 0.01 · T 0.01 · S 0.98</div>
+    <div class="probs"><span class="acceptable" style="width:1.2%" title="acceptable 1.2%"></span><span class="toxic" style="width:0.9%" title="toxic 0.9%"></span><span class="spam" style="width:98.0%" title="spam 98.0%"></span></div>
+    <div class="other">clef-flash: spam (0.84)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="4" data-label="acceptable" data-conf="0.9157" data-flag="0">
+  <div class="id">#4</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.92</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Does the reflection doc need to include the prompts we used? Mine is around 40 prompts, that seems like too much to paste.</div>
+    <div class="meta">Pooja Nair · Doubts · 2026-10-12 11:25 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:97.1%" title="acceptable 97.1%"></span><span class="toxic" style="width:1.5%" title="toxic 1.5%"></span><span class="spam" style="width:1.3%" title="spam 1.3%"></span></div>
+    <div class="other">clef-flash: acceptable (0.68)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="5" data-label="acceptable" data-conf="0.869" data-flag="0">
+  <div class="id">#5</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.87</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">@Rohit your expense splitter is really clean. One suggestion: there&#x27;s a rounding error when splitting ₹100 three ways, it shows 33.33 x 3 = 99.99.</div>
+    <div class="meta">Harsh Agarwal · Share your artifacts · 2026-10-12 12:10 · A 0.95 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.5%" title="acceptable 95.5%"></span><span class="toxic" style="width:2.4%" title="toxic 2.4%"></span><span class="spam" style="width:2.1%" title="spam 2.1%"></span></div>
+    <div class="other">clef-flash: acceptable (0.52)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="6" data-label="toxic" data-conf="0.6695" data-flag="0">
+  <div class="id">#6</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf">conf 0.67</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Rohit&#x27;s project is copy-paste from GitHub, everyone knows. Shameless guy, and sir still gives him marks. Pathetic.</div>
+    <div class="meta">Vikram Singh · Share your artifacts · 2026-10-12 12:31 · A 0.11 · T 0.88 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:11.2%" title="acceptable 11.2%"></span><span class="toxic" style="width:87.6%" title="toxic 87.6%"></span><span class="spam" style="width:1.2%" title="spam 1.2%"></span></div>
+    <div class="other">clef-flash: toxic (0.63)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="7" data-label="acceptable" data-conf="0.8728" data-flag="0">
+  <div class="id">#7</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.87</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Bhai kisi ko Codex ka access mila? My college email isn&#x27;t working for the student plan.</div>
+    <div class="meta">Mohd. Faizan · Doubts · 2026-10-12 13:05 · A 0.96 · T 0.02 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:95.6%" title="acceptable 95.6%"></span><span class="toxic" style="width:1.8%" title="toxic 1.8%"></span><span class="spam" style="width:2.6%" title="spam 2.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.67)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="8" data-label="acceptable" data-conf="0.8803" data-flag="0">
+  <div class="id">#8</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Ma&#x27;am, is a deadline extension possible? Our hostel wifi was down from Thursday night till Saturday, the warden can confirm.</div>
+    <div class="meta">Shreya Patil · Submission &amp; grading · 2026-10-12 14:47 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.9%" title="acceptable 95.9%"></span><span class="toxic" style="width:2.2%" title="toxic 2.2%"></span><span class="spam" style="width:1.9%" title="spam 1.9%"></span></div>
+    <div class="other">clef-flash: acceptable (0.61)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="9" data-label="acceptable" data-conf="0.8991" data-flag="0">
+  <div class="id">#9</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">I found that Claude kept adding features I didn&#x27;t ask for. Telling it &quot;do only X, nothing else&quot; at the start helped a lot.</div>
+    <div class="meta">Vivek Menon · Doubts · 2026-10-12 15:20 · A 0.97 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.5%" title="acceptable 96.5%"></span><span class="toxic" style="width:1.9%" title="toxic 1.9%"></span><span class="spam" style="width:1.6%" title="spam 1.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.67)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="10" data-label="spam" data-conf="0.9262" data-flag="0">
+  <div class="id">#10</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.93</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Join our Telegram group for FREE Claude Pro &amp; ChatGPT Plus accounts 🤑 only ₹199 lifetime. t.me/aitoolsdeal_india (limited slots)</div>
+    <div class="meta">Free AI Deals · General · 2026-10-12 16:02 · A 0.01 · T 0.01 · S 0.97</div>
+    <div class="probs"><span class="acceptable" style="width:1.4%" title="acceptable 1.4%"></span><span class="toxic" style="width:1.1%" title="toxic 1.1%"></span><span class="spam" style="width:97.5%" title="spam 97.5%"></span></div>
+    <div class="other">clef-flash: spam (0.84)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="11" data-label="acceptable" data-conf="0.9033" data-flag="0">
+  <div class="id">#11</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Can we deploy on Vercel or does it have to run locally? Mine needs an API key and I don&#x27;t want to expose it publicly.</div>
+    <div class="meta">Karthik Reddy · Doubts · 2026-10-12 17:33 · A 0.97 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.7%" title="acceptable 96.7%"></span><span class="toxic" style="width:1.7%" title="toxic 1.7%"></span><span class="spam" style="width:1.6%" title="spam 1.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.64)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="12" data-label="acceptable" data-conf="0.8764" data-flag="0">
+  <div class="id">#12</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Good point Sneha made in the lab: if the artifact stores data in localStorage, mention it in the reflection, since the data stays only in your browser.</div>
+    <div class="meta">Ananya Joshi · Doubts · 2026-10-12 18:15 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.7%" title="acceptable 95.7%"></span><span class="toxic" style="width:2.3%" title="toxic 2.3%"></span><span class="spam" style="width:1.9%" title="spam 1.9%"></span></div>
+    <div class="other">clef-flash: acceptable (0.59)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="13" data-label="toxic" data-conf="0.8767" data-flag="0">
+  <div class="id">#13</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Seriously who asks these dumb questions? Read the assignment PDF before posting, idiots. Wasting everyone&#x27;s time.</div>
+    <div class="meta">Saurabh Yadav · Doubts · 2026-10-12 19:02 · A 0.03 · T 0.96 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:3.5%" title="acceptable 3.5%"></span><span class="toxic" style="width:95.7%" title="toxic 95.7%"></span><span class="spam" style="width:0.8%" title="spam 0.8%"></span></div>
+    <div class="other">clef-flash: toxic (0.49)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="14" data-label="acceptable" data-conf="0.9149" data-flag="0">
+  <div class="id">#14</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.91</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Honestly I think this assignment is too easy for 15 marks, the AI does 80% of the work. Grading should focus more on the reflection part.</div>
+    <div class="meta">Nikhil Bansal · Submission &amp; grading · 2026-10-12 20:40 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:97.1%" title="acceptable 97.1%"></span><span class="toxic" style="width:1.7%" title="toxic 1.7%"></span><span class="spam" style="width:1.2%" title="spam 1.2%"></span></div>
+    <div class="other">clef-flash: acceptable (0.65)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="15" data-label="acceptable" data-conf="0.8741" data-flag="0">
+  <div class="id">#15</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.87</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">My quiz app for GATE prep is up. Feedback welcome, especially on the scoring logic — not sure the negative marking works right.</div>
+    <div class="meta">Ankit Sharma · Share your artifacts · 2026-10-13 08:55 · A 0.96 · T 0.02 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:95.7%" title="acceptable 95.7%"></span><span class="toxic" style="width:1.8%" title="toxic 1.8%"></span><span class="spam" style="width:2.5%" title="spam 2.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.40)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="16" data-label="acceptable" data-conf="0.868" data-flag="0">
+  <div class="id">#16</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.87</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Tried it Ankit, the negative marking subtracts 1/3 even for unattempted questions. Check the condition where you compute the score.</div>
+    <div class="meta">Meera Krishnan · Share your artifacts · 2026-10-13 09:30 · A 0.95 · T 0.03 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.4%" title="acceptable 95.4%"></span><span class="toxic" style="width:2.6%" title="toxic 2.6%"></span><span class="spam" style="width:1.9%" title="spam 1.9%"></span></div>
+    <div class="other">clef-flash: acceptable (0.55)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="17" data-label="spam" data-conf="0.9168" data-flag="0">
+  <div class="id">#17</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.92</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Earn ₹5000 daily from home using AI tools!! No investment. Students also eligible. DM me or visit earnwithai-india.in</div>
+    <div class="meta">Ritu Verma · General · 2026-10-13 10:12 · A 0.02 · T 0.01 · S 0.97</div>
+    <div class="probs"><span class="acceptable" style="width:1.6%" title="acceptable 1.6%"></span><span class="toxic" style="width:1.2%" title="toxic 1.2%"></span><span class="spam" style="width:97.2%" title="spam 97.2%"></span></div>
+    <div class="other">clef-flash: spam (0.79)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="18" data-label="acceptable" data-conf="0.9008" data-flag="0">
+  <div class="id">#18</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Sir, the rubric says &quot;originality&quot; — does a to-do app count as original if we add a feature like voice input?</div>
+    <div class="meta">Tanvi Gupta · Submission &amp; grading · 2026-10-13 11:05 · A 0.97 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.6%" title="acceptable 96.6%"></span><span class="toxic" style="width:1.8%" title="toxic 1.8%"></span><span class="spam" style="width:1.5%" title="spam 1.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.63)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="19" data-label="toxic" data-conf="0.4515" data-flag="1">
+  <div class="id">#19</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf low">conf 0.45</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Bro your app looks like it was made by a 5th class kid lol. Delete it and save us the embarrassment 🤡</div>
+    <div class="meta">Rahul Chauhan · Share your artifacts · 2026-10-13 11:48 · A 0.22 · T 0.77 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:21.8%" title="acceptable 21.8%"></span><span class="toxic" style="width:76.6%" title="toxic 76.6%"></span><span class="spam" style="width:1.6%" title="spam 1.6%"></span></div>
+    <div class="other">clef-flash: toxic (0.22)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="20" data-label="acceptable" data-conf="0.8821" data-flag="0">
+  <div class="id">#20</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Thank you ma&#x27;am for the extra session on prompting yesterday. The bit about giving examples of the output format was super useful.</div>
+    <div class="meta">Ishita Banerjee · General · 2026-10-13 12:20 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.0%" title="acceptable 96.0%"></span><span class="toxic" style="width:2.3%" title="toxic 2.3%"></span><span class="spam" style="width:1.8%" title="spam 1.8%"></span></div>
+    <div class="other">clef-flash: acceptable (0.62)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="21" data-label="acceptable" data-conf="0.8953" data-flag="0">
+  <div class="id">#21</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Codex wrote my tests but half of them were testing the wrong thing. Lesson learned: read the generated tests, don&#x27;t just see green ✅ and move on.</div>
+    <div class="meta">Siddharth Rao · Doubts · 2026-10-13 13:44 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.4%" title="acceptable 96.4%"></span><span class="toxic" style="width:2.1%" title="toxic 2.1%"></span><span class="spam" style="width:1.5%" title="spam 1.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.66)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="22" data-label="acceptable" data-conf="0.907" data-flag="0">
+  <div class="id">#22</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.91</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Is anyone else getting &quot;rate limit exceeded&quot; on the free tier? It&#x27;s been blocking me since afternoon.</div>
+    <div class="meta">Aman Tiwari · Doubts · 2026-10-13 15:10 · A 0.97 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.8%" title="acceptable 96.8%"></span><span class="toxic" style="width:1.7%" title="toxic 1.7%"></span><span class="spam" style="width:1.5%" title="spam 1.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.67)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="23" data-label="acceptable" data-conf="0.8896" data-flag="0">
+  <div class="id">#23</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.89</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Yes same, try after midnight, it reset for me around 12:30.</div>
+    <div class="meta">Pooja Nair · Doubts · 2026-10-13 15:26 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.2%" title="acceptable 96.2%"></span><span class="toxic" style="width:1.9%" title="toxic 1.9%"></span><span class="spam" style="width:1.8%" title="spam 1.8%"></span></div>
+    <div class="other">clef-flash: acceptable (0.54)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="24" data-label="spam" data-conf="0.6454" data-flag="0">
+  <div class="id">#24</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.65</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Subscribe to my YouTube channel &quot;TechWithRaju&quot; for the full solution of CS307 assignment 3 step by step!! Link in bio. Like share subscribe 🙏🙏</div>
+    <div class="meta">Raju Tech · General · 2026-10-13 16:03 · A 0.10 · T 0.03 · S 0.87</div>
+    <div class="probs"><span class="acceptable" style="width:10.5%" title="acceptable 10.5%"></span><span class="toxic" style="width:2.8%" title="toxic 2.8%"></span><span class="spam" style="width:86.7%" title="spam 86.7%"></span></div>
+    <div class="other">clef-flash: spam (0.71)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="25" data-label="acceptable" data-conf="0.8884" data-flag="0">
+  <div class="id">#25</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.89</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Our group made a canteen menu voting app. Problem: anyone can vote 100 times by refreshing. Any simple way to stop this without a login?</div>
+    <div class="meta">Kavya Pillai · Share your artifacts · 2026-10-13 17:22 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.2%" title="acceptable 96.2%"></span><span class="toxic" style="width:1.9%" title="toxic 1.9%"></span><span class="spam" style="width:2.0%" title="spam 2.0%"></span></div>
+    <div class="other">clef-flash: acceptable (0.60)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="26" data-label="acceptable" data-conf="0.821" data-flag="0">
+  <div class="id">#26</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.82</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Use a localStorage flag for basic prevention, it&#x27;s not secure but for a class demo it&#x27;s fine. Or ask for roll number and check duplicates.</div>
+    <div class="meta">Harsh Agarwal · Share your artifacts · 2026-10-13 17:40 · A 0.94 · T 0.03 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:93.7%" title="acceptable 93.7%"></span><span class="toxic" style="width:3.2%" title="toxic 3.2%"></span><span class="spam" style="width:3.1%" title="spam 3.1%"></span></div>
+    <div class="other">clef-flash: acceptable (0.53)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="27" data-label="toxic" data-conf="0.2575" data-flag="1">
+  <div class="id">#27</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf low">conf 0.26</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Girls in this class only get good marks because sir is soft on them. Ishita&#x27;s project is average at best.</div>
+    <div class="meta">Deepak Mishra · Submission &amp; grading · 2026-10-13 19:05 · A 0.40 · T 0.58 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:40.5%" title="acceptable 40.5%"></span><span class="toxic" style="width:58.4%" title="toxic 58.4%"></span><span class="spam" style="width:1.1%" title="spam 1.1%"></span></div>
+    <div class="other disagree">clef-flash: acceptable (0.40)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="28" data-label="acceptable" data-conf="0.7862" data-flag="0">
+  <div class="id">#28</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.79</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Sharing a tip: ask Claude to explain the code it wrote line by line before you submit. Viva mein pakde jaoge otherwise 😅</div>
+    <div class="meta">Omkar Jadhav · Doubts · 2026-10-13 20:30 · A 0.92 · T 0.04 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:92.4%" title="acceptable 92.4%"></span><span class="toxic" style="width:4.2%" title="toxic 4.2%"></span><span class="spam" style="width:3.3%" title="spam 3.3%"></span></div>
+    <div class="other">clef-flash: acceptable (0.39)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="29" data-label="acceptable" data-conf="0.9026" data-flag="0">
+  <div class="id">#29</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Is the viva individual or group-wise? Some of us did most of the work and others just watched.</div>
+    <div class="meta">Prateek Saxena · Submission &amp; grading · 2026-10-14 09:02 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:96.7%" title="acceptable 96.7%"></span><span class="toxic" style="width:2.0%" title="toxic 2.0%"></span><span class="spam" style="width:1.3%" title="spam 1.3%"></span></div>
+    <div class="other">clef-flash: acceptable (0.68)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="30" data-label="acceptable" data-conf="0.8941" data-flag="0">
+  <div class="id">#30</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.89</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">^ this. In my group one member didn&#x27;t even open the repo. How do we report this without drama?</div>
+    <div class="meta">Ritika Sen · Submission &amp; grading · 2026-10-14 09:20 · A 0.96 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:96.4%" title="acceptable 96.4%"></span><span class="toxic" style="width:2.3%" title="toxic 2.3%"></span><span class="spam" style="width:1.3%" title="spam 1.3%"></span></div>
+    <div class="other">clef-flash: acceptable (0.66)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="31" data-label="toxic" data-conf="0.8902" data-flag="0">
+  <div class="id">#31</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf">conf 0.89</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">@Karan we all know you&#x27;re the one who didn&#x27;t open the repo. Useless fellow, always free-riding. Get lost.</div>
+    <div class="meta">Rahul Chauhan · Submission &amp; grading · 2026-10-14 09:41 · A 0.03 · T 0.96 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:3.0%" title="acceptable 3.0%"></span><span class="toxic" style="width:96.2%" title="toxic 96.2%"></span><span class="spam" style="width:0.8%" title="spam 0.8%"></span></div>
+    <div class="other">clef-flash: toxic (0.61)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="32" data-label="acceptable" data-conf="0.9028" data-flag="0">
+  <div class="id">#32</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Can we use Gemini or other models, or strictly Claude/Codex? The assignment title says Claude/Codex but the PDF says &quot;any AI coding assistant&quot;.</div>
+    <div class="meta">Aditya Kulkarni · Doubts · 2026-10-14 10:15 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:96.7%" title="acceptable 96.7%"></span><span class="toxic" style="width:1.8%" title="toxic 1.8%"></span><span class="spam" style="width:1.5%" title="spam 1.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.66)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="33" data-label="spam" data-conf="0.8628" data-flag="0">
+  <div class="id">#33</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.86</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">URGENT: CS307 end-sem question paper leaked!! Get it before it&#x27;s removed. ₹499 only. Pay on UPI 9000012345@upi and send screenshot.</div>
+    <div class="meta">exam_updates_2026 · General · 2026-10-14 11:00 · A 0.03 · T 0.02 · S 0.95</div>
+    <div class="probs"><span class="acceptable" style="width:3.0%" title="acceptable 3.0%"></span><span class="toxic" style="width:1.7%" title="toxic 1.7%"></span><span class="spam" style="width:95.2%" title="spam 95.2%"></span></div>
+    <div class="other">clef-flash: spam (0.78)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="34" data-label="acceptable" data-conf="0.8822" data-flag="0">
+  <div class="id">#34</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Sir, the submission link on Moodle is showing &quot;closed&quot; even though the deadline is tonight 11:59 PM.</div>
+    <div class="meta">Shreya Patil · Submission &amp; grading · 2026-10-14 21:12 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.0%" title="acceptable 96.0%"></span><span class="toxic" style="width:2.1%" title="toxic 2.1%"></span><span class="spam" style="width:1.9%" title="spam 1.9%"></span></div>
+    <div class="other">clef-flash: acceptable (0.70)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="35" data-label="acceptable" data-conf="0.8319" data-flag="0">
+  <div class="id">#35</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.83</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">It&#x27;s open now, please refresh. It was a timezone setting issue on the course page.</div>
+    <div class="meta">Rakesh M (TA) · Submission &amp; grading · 2026-10-14 21:30 · A 0.94 · T 0.03 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:94.1%" title="acceptable 94.1%"></span><span class="toxic" style="width:2.8%" title="toxic 2.8%"></span><span class="spam" style="width:3.1%" title="spam 3.1%"></span></div>
+    <div class="other">clef-flash: acceptable (0.51)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="36" data-label="acceptable" data-conf="0.8747" data-flag="0">
+  <div class="id">#36</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.87</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">My artifact helps my mom track her tailoring orders. She actually uses it now! Never thought an assignment would be useful at home.</div>
+    <div class="meta">Divya Hegde · Share your artifacts · 2026-10-15 08:40 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.7%" title="acceptable 95.7%"></span><span class="toxic" style="width:2.1%" title="toxic 2.1%"></span><span class="spam" style="width:2.2%" title="spam 2.2%"></span></div>
+    <div class="other">clef-flash: acceptable (0.44)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="37" data-label="acceptable" data-conf="0.847" data-flag="0">
+  <div class="id">#37</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.85</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">That&#x27;s amazing Divya 👏 Maybe add a WhatsApp reminder for due dates? Could be a nice extension.</div>
+    <div class="meta">Ananya Joshi · Share your artifacts · 2026-10-15 09:05 · A 0.95 · T 0.03 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:94.7%" title="acceptable 94.7%"></span><span class="toxic" style="width:2.6%" title="toxic 2.6%"></span><span class="spam" style="width:2.7%" title="spam 2.7%"></span></div>
+    <div class="other">clef-flash: acceptable (0.49)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="38" data-label="acceptable" data-conf="0.9108" data-flag="0">
+  <div class="id">#38</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.91</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Doubt: if Claude generates code that&#x27;s similar to some open-source project, is that plagiarism? How do we cite it?</div>
+    <div class="meta">Kunal Bhatia · Doubts · 2026-10-15 10:18 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:97.0%" title="acceptable 97.0%"></span><span class="toxic" style="width:1.6%" title="toxic 1.6%"></span><span class="spam" style="width:1.4%" title="spam 1.4%"></span></div>
+    <div class="other">clef-flash: acceptable (0.64)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="39" data-label="acceptable" data-conf="0.8334" data-flag="0">
+  <div class="id">#39</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.83</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Good question. Mention the tool and your prompts in the reflection, and if you knowingly used a library or snippet, cite it like any other source.</div>
+    <div class="meta">Dr. Lakshmi Narayanan · Doubts · 2026-10-15 11:02 · A 0.94 · T 0.03 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:94.2%" title="acceptable 94.2%"></span><span class="toxic" style="width:3.3%" title="toxic 3.3%"></span><span class="spam" style="width:2.5%" title="spam 2.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.69)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="40" data-label="spam" data-conf="0.8607" data-flag="0">
+  <div class="id">#40</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.86</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Cheap laptops for engineering students!! i5 12th gen just ₹18,999. Limited stock. Call Shree Computers, Shivaji Nagar 📞 90000 54321</div>
+    <div class="meta">Shree Computers · General · 2026-10-15 12:30 · A 0.03 · T 0.02 · S 0.95</div>
+    <div class="probs"><span class="acceptable" style="width:2.8%" title="acceptable 2.8%"></span><span class="toxic" style="width:2.1%" title="toxic 2.1%"></span><span class="spam" style="width:95.2%" title="spam 95.2%"></span></div>
+    <div class="other">clef-flash: spam (0.68)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="41" data-label="toxic" data-conf="0.269" data-flag="1">
+  <div class="id">#41</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf low">conf 0.27</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">This forum is full of sir&#x27;s chamchas. Everybody praising every useless app. Fake people.</div>
+    <div class="meta">Vikram Singh · Share your artifacts · 2026-10-15 13:15 · A 0.35 · T 0.62 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:34.9%" title="acceptable 34.9%"></span><span class="toxic" style="width:62.5%" title="toxic 62.5%"></span><span class="spam" style="width:2.6%" title="spam 2.6%"></span></div>
+    <div class="other">clef-flash: toxic (0.27)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="42" data-label="acceptable" data-conf="0.9169" data-flag="0">
+  <div class="id">#42</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.92</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">I&#x27;m not sure using AI for assignments is actually teaching us anything. I learned more debugging the output than from the tool itself.</div>
+    <div class="meta">Kunal Bhatia · General · 2026-10-15 14:00 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:97.2%" title="acceptable 97.2%"></span><span class="toxic" style="width:1.6%" title="toxic 1.6%"></span><span class="spam" style="width:1.2%" title="spam 1.2%"></span></div>
+    <div class="other">clef-flash: acceptable (0.76)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="43" data-label="acceptable" data-conf="0.8784" data-flag="0">
+  <div class="id">#43</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Disagree a bit — knowing what to ask and how to check the output is itself a skill. Industry is going this way anyway.</div>
+    <div class="meta">Siddharth Rao · General · 2026-10-15 14:22 · A 0.96 · T 0.03 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.8%" title="acceptable 95.8%"></span><span class="toxic" style="width:2.5%" title="toxic 2.5%"></span><span class="spam" style="width:1.7%" title="spam 1.7%"></span></div>
+    <div class="other">clef-flash: acceptable (0.63)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="44" data-label="acceptable" data-conf="0.8727" data-flag="0">
+  <div class="id">#44</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.87</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">My Codex output used a deprecated pandas function (append). Fixed it with concat. Posting in case anyone else hits the same error.</div>
+    <div class="meta">Vivek Menon · Doubts · 2026-10-15 16:35 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.6%" title="acceptable 95.6%"></span><span class="toxic" style="width:2.0%" title="toxic 2.0%"></span><span class="spam" style="width:2.4%" title="spam 2.4%"></span></div>
+    <div class="other">clef-flash: acceptable (0.52)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="45" data-label="acceptable" data-conf="0.8961" data-flag="0">
+  <div class="id">#45</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Thanks Vivek, was stuck on exactly this for an hour 🙏</div>
+    <div class="meta">Tanvi Gupta · Doubts · 2026-10-15 16:50 · A 0.96 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:96.4%" title="acceptable 96.4%"></span><span class="toxic" style="width:2.1%" title="toxic 2.1%"></span><span class="spam" style="width:1.5%" title="spam 1.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.61)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="46" data-label="spam" data-conf="0.9264" data-flag="0">
+  <div class="id">#46</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.93</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">💰 Crypto signals group 💰 90% accuracy, students making ₹50k/month. Join fast before closing: bit.ly/crypto-signal-vip</div>
+    <div class="meta">CryptoKing Official · General · 2026-10-15 18:00 · A 0.01 · T 0.01 · S 0.97</div>
+    <div class="probs"><span class="acceptable" style="width:1.4%" title="acceptable 1.4%"></span><span class="toxic" style="width:1.1%" title="toxic 1.1%"></span><span class="spam" style="width:97.5%" title="spam 97.5%"></span></div>
+    <div class="other">clef-flash: spam (0.82)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="47" data-label="acceptable" data-conf="0.8918" data-flag="0">
+  <div class="id">#47</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.89</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Ma&#x27;am, will the marks be uploaded before the Diwali break?</div>
+    <div class="meta">Mohd. Faizan · Submission &amp; grading · 2026-10-16 09:10 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.3%" title="acceptable 96.3%"></span><span class="toxic" style="width:2.2%" title="toxic 2.2%"></span><span class="spam" style="width:1.6%" title="spam 1.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.58)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="48" data-label="toxic" data-conf="0.8055" data-flag="0">
+  <div class="id">#48</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf">conf 0.81</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Whoever gave my project 2/10 in peer review, you&#x27;re a jealous loser. I know who you are and I&#x27;ll see you outside the lab.</div>
+    <div class="meta">Deepak Mishra · Submission &amp; grading · 2026-10-16 10:25 · A 0.06 · T 0.93 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:5.9%" title="acceptable 5.9%"></span><span class="toxic" style="width:93.1%" title="toxic 93.1%"></span><span class="spam" style="width:1.0%" title="spam 1.0%"></span></div>
+    <div class="other">clef-flash: toxic (0.63)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="49" data-label="acceptable" data-conf="0.8802" data-flag="0">
+  <div class="id">#49</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Peer review feedback was helpful, thanks to whoever pointed out the mobile layout breaking. Fixed it.</div>
+    <div class="meta">Kavya Pillai · Submission &amp; grading · 2026-10-16 11:00 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.9%" title="acceptable 95.9%"></span><span class="toxic" style="width:2.4%" title="toxic 2.4%"></span><span class="spam" style="width:1.7%" title="spam 1.7%"></span></div>
+    <div class="other">clef-flash: acceptable (0.65)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="50" data-label="acceptable" data-conf="0.9191" data-flag="0">
+  <div class="id">#50</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.92</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Can someone explain what &quot;artifact&quot; means here? Is it just the code or a deployed thing people can open?</div>
+    <div class="meta">Riya Thomas · Doubts · 2026-10-16 11:40 · A 0.97 · T 0.01 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:97.2%" title="acceptable 97.2%"></span><span class="toxic" style="width:1.5%" title="toxic 1.5%"></span><span class="spam" style="width:1.3%" title="spam 1.3%"></span></div>
+    <div class="other">clef-flash: acceptable (0.66)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="51" data-label="acceptable" data-conf="0.8321" data-flag="0">
+  <div class="id">#51</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.83</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">From the PDF: artifact = a working, shareable thing (web page, tool, small app) + a 1-page reflection. Code alone isn&#x27;t enough.</div>
+    <div class="meta">Rakesh M (TA) · Doubts · 2026-10-16 12:05 · A 0.94 · T 0.03 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:94.2%" title="acceptable 94.2%"></span><span class="toxic" style="width:3.2%" title="toxic 3.2%"></span><span class="spam" style="width:2.6%" title="spam 2.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.44)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="52" data-label="acceptable" data-conf="0.863" data-flag="0">
+  <div class="id">#52</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.86</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Built a Marathi–English vocabulary flashcard app. Claude handled the Devanagari fonts without issues, which surprised me.</div>
+    <div class="meta">Shruti Deshpande · Share your artifacts · 2026-10-16 14:15 · A 0.95 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.3%" title="acceptable 95.3%"></span><span class="toxic" style="width:2.4%" title="toxic 2.4%"></span><span class="spam" style="width:2.3%" title="spam 2.3%"></span></div>
+    <div class="other">clef-flash: acceptable (0.47)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="53" data-label="acceptable" data-conf="0.8849" data-flag="0">
+  <div class="id">#53</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Nice! Does it do audio pronunciation? The browser speech API supports mr-IN I think.</div>
+    <div class="meta">Karthik Reddy · Share your artifacts · 2026-10-16 14:40 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.0%" title="acceptable 96.0%"></span><span class="toxic" style="width:2.1%" title="toxic 2.1%"></span><span class="spam" style="width:1.8%" title="spam 1.8%"></span></div>
+    <div class="other">clef-flash: acceptable (0.53)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="54" data-label="spam" data-conf="0.9496" data-flag="0">
+  <div class="id">#54</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.95</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Need help with your assignment? Our PhD experts do Python, Java, ML, AI projects. Fast delivery in 24 hours. Visit www.assignmenthelpzone.co.in or mail help@assignmenthelpzone.co.in</div>
+    <div class="meta">Assignment Help Zone · General · 2026-10-16 15:30 · A 0.01 · T 0.01 · S 0.98</div>
+    <div class="probs"><span class="acceptable" style="width:1.0%" title="acceptable 1.0%"></span><span class="toxic" style="width:0.7%" title="toxic 0.7%"></span><span class="spam" style="width:98.3%" title="spam 98.3%"></span></div>
+    <div class="other">clef-flash: spam (0.83)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="55" data-label="toxic" data-conf="0.6218" data-flag="0">
+  <div class="id">#55</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf">conf 0.62</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Ankit&#x27;s GATE quiz app is trash just like his GATE score will be 😂😂</div>
+    <div class="meta">Saurabh Yadav · Share your artifacts · 2026-10-16 16:02 · A 0.13 · T 0.85 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:13.5%" title="acceptable 13.5%"></span><span class="toxic" style="width:85.4%" title="toxic 85.4%"></span><span class="spam" style="width:1.1%" title="spam 1.1%"></span></div>
+    <div class="other">clef-flash: toxic (0.41)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="56" data-label="acceptable" data-conf="0.9008" data-flag="0">
+  <div class="id">#56</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Request: can the TA share a sample of a good reflection from last year? Not sure what level of detail is expected.</div>
+    <div class="meta">Prateek Saxena · Submission &amp; grading · 2026-10-16 18:20 · A 0.97 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.6%" title="acceptable 96.6%"></span><span class="toxic" style="width:1.9%" title="toxic 1.9%"></span><span class="spam" style="width:1.5%" title="spam 1.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.56)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="57" data-label="acceptable" data-conf="0.8602" data-flag="0">
+  <div class="id">#57</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.86</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Sir, I submitted the wrong link by mistake (my old repo). Can you allow a resubmission?</div>
+    <div class="meta">Aman Tiwari · Submission &amp; grading · 2026-10-16 22:45 · A 0.95 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.2%" title="acceptable 95.2%"></span><span class="toxic" style="width:2.4%" title="toxic 2.4%"></span><span class="spam" style="width:2.4%" title="spam 2.4%"></span></div>
+    <div class="other">clef-flash: acceptable (0.56)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="58" data-label="acceptable" data-conf="0.9137" data-flag="0">
+  <div class="id">#58</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.91</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Is it fine if our artifact uses a free public API (like weather)? Or should everything be self-contained?</div>
+    <div class="meta">Riya Thomas · Doubts · 2026-10-17 09:00 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:97.1%" title="acceptable 97.1%"></span><span class="toxic" style="width:1.6%" title="toxic 1.6%"></span><span class="spam" style="width:1.4%" title="spam 1.4%"></span></div>
+    <div class="other">clef-flash: acceptable (0.65)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="59" data-label="acceptable" data-conf="0.8884" data-flag="0">
+  <div class="id">#59</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.89</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">My experience: Claude is better at explaining, Codex felt faster for refactoring. Both hallucinated a library function once.</div>
+    <div class="meta">Meera Krishnan · General · 2026-10-17 10:30 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.2%" title="acceptable 96.2%"></span><span class="toxic" style="width:2.2%" title="toxic 2.2%"></span><span class="spam" style="width:1.7%" title="spam 1.7%"></span></div>
+    <div class="other">clef-flash: acceptable (0.50)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="60" data-label="acceptable" data-conf="0.8723" data-flag="0">
+  <div class="id">#60</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.87</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Agree. Codex invented a &quot;pd.read_html_table&quot; function for me 😂 Always run the code.</div>
+    <div class="meta">Nikhil Bansal · General · 2026-10-17 10:52 · A 0.96 · T 0.03 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.6%" title="acceptable 95.6%"></span><span class="toxic" style="width:2.6%" title="toxic 2.6%"></span><span class="spam" style="width:1.8%" title="spam 1.8%"></span></div>
+    <div class="other">clef-flash: acceptable (0.48)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="61" data-label="toxic" data-conf="0.7991" data-flag="0">
+  <div class="id">#61</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf">conf 0.80</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Shut up Meera, nobody cares about your &quot;experience&quot;. Topper behaviour as usual 🙄</div>
+    <div class="meta">Rahul Chauhan · General · 2026-10-17 11:10 · A 0.06 · T 0.93 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:5.9%" title="acceptable 5.9%"></span><span class="toxic" style="width:92.9%" title="toxic 92.9%"></span><span class="spam" style="width:1.2%" title="spam 1.2%"></span></div>
+    <div class="other">clef-flash: toxic (0.63)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="62" data-label="acceptable" data-conf="0.856" data-flag="0">
+  <div class="id">#62</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.86</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Our hostel group made an attendance tracker for the mess. Uploaded screenshots to the drive folder as instructed.</div>
+    <div class="meta">Omkar Jadhav · Share your artifacts · 2026-10-17 12:40 · A 0.95 · T 0.02 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:95.0%" title="acceptable 95.0%"></span><span class="toxic" style="width:2.4%" title="toxic 2.4%"></span><span class="spam" style="width:2.6%" title="spam 2.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.43)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="63" data-label="spam" data-conf="0.8486" data-flag="0">
+  <div class="id">#63</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.85</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Hello dear friends, I am selling original notes of all subjects 3rd year CSE. PDF available at low price. Contact on Instagram @notes.wala.bhaiya</div>
+    <div class="meta">Notes Wala Bhaiya · General · 2026-10-17 13:30 · A 0.03 · T 0.02 · S 0.95</div>
+    <div class="probs"><span class="acceptable" style="width:3.1%" title="acceptable 3.1%"></span><span class="toxic" style="width:2.2%" title="toxic 2.2%"></span><span class="spam" style="width:94.7%" title="spam 94.7%"></span></div>
+    <div class="other">clef-flash: spam (0.74)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="64" data-label="acceptable" data-conf="0.8711" data-flag="0">
+  <div class="id">#64</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.87</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Ma&#x27;am, our artifact is for visually impaired users (screen-reader friendly bus timings). Can we get extra time to test it with actual users from the NGO?</div>
+    <div class="meta">Arjun Das · Submission &amp; grading · 2026-10-17 15:05 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.6%" title="acceptable 95.6%"></span><span class="toxic" style="width:2.2%" title="toxic 2.2%"></span><span class="spam" style="width:2.2%" title="spam 2.2%"></span></div>
+    <div class="other">clef-flash: acceptable (0.53)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="65" data-label="acceptable" data-conf="0.8182" data-flag="0">
+  <div class="id">#65</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.82</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">That&#x27;s a great project, Arjun. Happy to help test with NVDA if you need another tester.</div>
+    <div class="meta">Neha Kapoor · Submission &amp; grading · 2026-10-17 15:30 · A 0.94 · T 0.03 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:93.6%" title="acceptable 93.6%"></span><span class="toxic" style="width:3.4%" title="toxic 3.4%"></span><span class="spam" style="width:3.0%" title="spam 3.0%"></span></div>
+    <div class="other">clef-flash: acceptable (0.48)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="66" data-label="acceptable" data-conf="0.8872" data-flag="0">
+  <div class="id">#66</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.89</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Kya reflection Hindi mein likh sakte hain? My English writing is not that good but I can explain properly in Hindi.</div>
+    <div class="meta">Sonu Kumar · Doubts · 2026-10-17 17:10 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.1%" title="acceptable 96.1%"></span><span class="toxic" style="width:2.3%" title="toxic 2.3%"></span><span class="spam" style="width:1.6%" title="spam 1.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.61)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="67" data-label="acceptable" data-conf="0.9099" data-flag="0">
+  <div class="id">#67</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.91</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">The rubric weightage is unclear. 40% artifact, 40% reflection, 20% viva — is that correct? The slides said something different.</div>
+    <div class="meta">Ishita Banerjee · Submission &amp; grading · 2026-10-18 09:25 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:96.9%" title="acceptable 96.9%"></span><span class="toxic" style="width:1.8%" title="toxic 1.8%"></span><span class="spam" style="width:1.3%" title="spam 1.3%"></span></div>
+    <div class="other">clef-flash: acceptable (0.70)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="68" data-label="acceptable" data-conf="0.9144" data-flag="0">
+  <div class="id">#68</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.91</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">The grading for assignment 2 was unfair in my opinion, the same output got different marks in different batches. Please clarify the re-evaluation process.</div>
+    <div class="meta">Ritika Sen · Submission &amp; grading · 2026-10-18 10:00 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:97.1%" title="acceptable 97.1%"></span><span class="toxic" style="width:1.8%" title="toxic 1.8%"></span><span class="spam" style="width:1.1%" title="spam 1.1%"></span></div>
+    <div class="other">clef-flash: acceptable (0.73)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="69" data-label="toxic" data-conf="0.6025" data-flag="1">
+  <div class="id">#69</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf">conf 0.60</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">TA doesn&#x27;t know anything himself, how will he grade AI projects? Clueless fellow should go back to school.</div>
+    <div class="meta">Vikram Singh · Submission &amp; grading · 2026-10-18 10:22 · A 0.15 · T 0.84 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:14.7%" title="acceptable 14.7%"></span><span class="toxic" style="width:84.5%" title="toxic 84.5%"></span><span class="spam" style="width:0.8%" title="spam 0.8%"></span></div>
+    <div class="other disagree">clef-flash: acceptable (0.63)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="70" data-label="acceptable" data-conf="0.8835" data-flag="0">
+  <div class="id">#70</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Tip for anyone using Claude artifacts: ask it to add a &quot;reset data&quot; button. Saved me during the demo when the test data got messed up.</div>
+    <div class="meta">Harsh Agarwal · Doubts · 2026-10-18 12:15 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.0%" title="acceptable 96.0%"></span><span class="toxic" style="width:1.9%" title="toxic 1.9%"></span><span class="spam" style="width:2.1%" title="spam 2.1%"></span></div>
+    <div class="other">clef-flash: acceptable (0.46)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="71" data-label="spam" data-conf="0.8371" data-flag="0">
+  <div class="id">#71</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.84</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">FREE iPhone 17 giveaway for college students 🎉 Just fill the form with your name, college ID and Aadhaar number: forms-giveaway-india.com/iphone</div>
+    <div class="meta">Giveaway India · General · 2026-10-18 13:00 · A 0.03 · T 0.03 · S 0.94</div>
+    <div class="probs"><span class="acceptable" style="width:3.1%" title="acceptable 3.1%"></span><span class="toxic" style="width:2.5%" title="toxic 2.5%"></span><span class="spam" style="width:94.3%" title="spam 94.3%"></span></div>
+    <div class="other">clef-flash: spam (0.72)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="72" data-label="acceptable" data-conf="0.8587" data-flag="0">
+  <div class="id">#72</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.86</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Our team used Codex to convert old C++ lab programs into a small web visualizer for sorting algorithms. Feedback welcome!</div>
+    <div class="meta">Gaurav Pandey · Share your artifacts · 2026-10-18 15:45 · A 0.95 · T 0.02 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:95.1%" title="acceptable 95.1%"></span><span class="toxic" style="width:2.3%" title="toxic 2.3%"></span><span class="spam" style="width:2.6%" title="spam 2.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.47)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="73" data-label="acceptable" data-conf="0.8796" data-flag="0">
+  <div class="id">#73</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Very nice, but the bubble sort animation is too fast to follow. Maybe add a speed slider?</div>
+    <div class="meta">Shruti Deshpande · Share your artifacts · 2026-10-18 16:10 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.9%" title="acceptable 95.9%"></span><span class="toxic" style="width:2.3%" title="toxic 2.3%"></span><span class="spam" style="width:1.8%" title="spam 1.8%"></span></div>
+    <div class="other">clef-flash: acceptable (0.59)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="74" data-label="acceptable" data-conf="0.9174" data-flag="0">
+  <div class="id">#74</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.92</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Is there a word limit for the reflection? I wrote 1100 words, feels too long.</div>
+    <div class="meta">Tanvi Gupta · Doubts · 2026-10-18 18:30 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:97.2%" title="acceptable 97.2%"></span><span class="toxic" style="width:1.6%" title="toxic 1.6%"></span><span class="spam" style="width:1.2%" title="spam 1.2%"></span></div>
+    <div class="other">clef-flash: acceptable (0.70)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="75" data-label="acceptable" data-conf="0.8254" data-flag="0">
+  <div class="id">#75</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.83</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Ma&#x27;am said max 1 page, so around 500 words.</div>
+    <div class="meta">Pooja Nair · Doubts · 2026-10-18 18:45 · A 0.94 · T 0.03 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:93.9%" title="acceptable 93.9%"></span><span class="toxic" style="width:3.4%" title="toxic 3.4%"></span><span class="spam" style="width:2.7%" title="spam 2.7%"></span></div>
+    <div class="other">clef-flash: acceptable (0.55)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="76" data-label="acceptable" data-conf="0.2174" data-flag="1">
+  <div class="id">#76</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf low">conf 0.22</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Everyone from that side of the hostel copies, it&#x27;s in their blood. Don&#x27;t trust their &quot;original&quot; projects.</div>
+    <div class="meta">Deepak Mishra · Share your artifacts · 2026-10-19 09:10 · A 0.53 · T 0.45 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:52.7%" title="acceptable 52.7%"></span><span class="toxic" style="width:44.8%" title="toxic 44.8%"></span><span class="spam" style="width:2.6%" title="spam 2.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.52)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="77" data-label="acceptable" data-conf="0.902" data-flag="0">
+  <div class="id">#77</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Sir, what happens if our deployed link stops working after submission (free hosting expires)? Will we lose marks?</div>
+    <div class="meta">Gaurav Pandey · Submission &amp; grading · 2026-10-19 10:30 · A 0.97 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.7%" title="acceptable 96.7%"></span><span class="toxic" style="width:1.7%" title="toxic 1.7%"></span><span class="spam" style="width:1.6%" title="spam 1.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.65)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="78" data-label="acceptable" data-conf="0.8611" data-flag="0">
+  <div class="id">#78</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.86</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">I shared a short screen recording as a backup in case the link fails. Maybe others should do the same.</div>
+    <div class="meta">Kavya Pillai · Submission &amp; grading · 2026-10-19 10:50 · A 0.95 · T 0.02 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:95.2%" title="acceptable 95.2%"></span><span class="toxic" style="width:2.2%" title="toxic 2.2%"></span><span class="spam" style="width:2.6%" title="spam 2.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.51)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="79" data-label="spam" data-conf="0.9132" data-flag="0">
+  <div class="id">#79</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.91</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">👉 Get 10,000 Instagram followers in 1 day 👈 Real &amp; active. Best for students starting tech pages. WhatsApp 90000 67890</div>
+    <div class="meta">InstaGrowth Services · General · 2026-10-19 12:00 · A 0.02 · T 0.01 · S 0.97</div>
+    <div class="probs"><span class="acceptable" style="width:1.6%" title="acceptable 1.6%"></span><span class="toxic" style="width:1.4%" title="toxic 1.4%"></span><span class="spam" style="width:97.0%" title="spam 97.0%"></span></div>
+    <div class="other">clef-flash: spam (0.80)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="80" data-label="acceptable" data-conf="0.9148" data-flag="0">
+  <div class="id">#80</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.91</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">I&#x27;m struggling honestly. Everyone is posting cool apps and mine barely works. Is it okay to submit something simple if the reflection is honest?</div>
+    <div class="meta">Kunal Bhatia · General · 2026-10-19 21:40 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:97.1%" title="acceptable 97.1%"></span><span class="toxic" style="width:1.6%" title="toxic 1.6%"></span><span class="spam" style="width:1.3%" title="spam 1.3%"></span></div>
+    <div class="other">clef-flash: acceptable (0.69)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="81" data-label="acceptable" data-conf="0.8649" data-flag="0">
+  <div class="id">#81</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.86</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Absolutely okay. Sir said in class that the reflection about what failed counts a lot. Don&#x27;t stress, simple + honest &gt; fancy + copied.</div>
+    <div class="meta">Neha Kapoor · General · 2026-10-19 22:05 · A 0.95 · T 0.03 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.3%" title="acceptable 95.3%"></span><span class="toxic" style="width:2.8%" title="toxic 2.8%"></span><span class="spam" style="width:1.9%" title="spam 1.9%"></span></div>
+    <div class="other">clef-flash: acceptable (0.56)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="82" data-label="acceptable" data-conf="0.8846" data-flag="0">
+  <div class="id">#82</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Thank you Neha, that really helps 🙂</div>
+    <div class="meta">Kunal Bhatia · General · 2026-10-19 22:20 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.0%" title="acceptable 96.0%"></span><span class="toxic" style="width:2.4%" title="toxic 2.4%"></span><span class="spam" style="width:1.6%" title="spam 1.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.55)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="83" data-label="toxic" data-conf="0.3651" data-flag="1">
+  <div class="id">#83</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf low">conf 0.37</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">lol Kunal still crying about his project. Maybe engineering isn&#x27;t for you bro, try BA.</div>
+    <div class="meta">Saurabh Yadav · General · 2026-10-19 22:48 · A 0.28 · T 0.71 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:27.9%" title="acceptable 27.9%"></span><span class="toxic" style="width:70.6%" title="toxic 70.6%"></span><span class="spam" style="width:1.5%" title="spam 1.5%"></span></div>
+    <div class="other disagree">clef-flash: acceptable (0.48)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="84" data-label="acceptable" data-conf="0.9046" data-flag="0">
+  <div class="id">#84</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Doubt: Claude gave different code for the same prompt twice. Which one should we submit, and should we mention it?</div>
+    <div class="meta">Sonu Kumar · Doubts · 2026-10-20 09:30 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:96.7%" title="acceptable 96.7%"></span><span class="toxic" style="width:1.8%" title="toxic 1.8%"></span><span class="spam" style="width:1.5%" title="spam 1.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.66)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="85" data-label="acceptable" data-conf="0.8421" data-flag="0">
+  <div class="id">#85</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.84</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Submit the one you tested and understand. Mentioning the variation in your reflection is actually a good insight.</div>
+    <div class="meta">Meera Krishnan · Doubts · 2026-10-20 09:55 · A 0.95 · T 0.03 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:94.5%" title="acceptable 94.5%"></span><span class="toxic" style="width:2.9%" title="toxic 2.9%"></span><span class="spam" style="width:2.6%" title="spam 2.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.52)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="86" data-label="spam" data-conf="0.908" data-flag="0">
+  <div class="id">#86</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.91</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Part time job for students: typing work, ₹800/day, no target. Registration fee only ₹299. Reply &quot;INTERESTED&quot; with your number.</div>
+    <div class="meta">Work From Home Jobs · General · 2026-10-20 11:00 · A 0.02 · T 0.01 · S 0.97</div>
+    <div class="probs"><span class="acceptable" style="width:1.9%" title="acceptable 1.9%"></span><span class="toxic" style="width:1.2%" title="toxic 1.2%"></span><span class="spam" style="width:96.9%" title="spam 96.9%"></span></div>
+    <div class="other">clef-flash: spam (0.75)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="87" data-label="acceptable" data-conf="0.9176" data-flag="0">
+  <div class="id">#87</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.92</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Can we work on an existing personal project and extend it with AI, or must it be new?</div>
+    <div class="meta">Aditya Kulkarni · Doubts · 2026-10-20 12:20 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:97.2%" title="acceptable 97.2%"></span><span class="toxic" style="width:1.5%" title="toxic 1.5%"></span><span class="spam" style="width:1.3%" title="spam 1.3%"></span></div>
+    <div class="other">clef-flash: acceptable (0.63)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="88" data-label="acceptable" data-conf="0.7512" data-flag="0">
+  <div class="id">#88</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.75</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Ankit, sorry for that comment about your app and your GATE score, it was uncalled for. The app is actually good, just that one bug.</div>
+    <div class="meta">Saurabh Yadav · Share your artifacts · 2026-10-20 13:10 · A 0.91 · T 0.07 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:91.0%" title="acceptable 91.0%"></span><span class="toxic" style="width:6.8%" title="toxic 6.8%"></span><span class="spam" style="width:2.2%" title="spam 2.2%"></span></div>
+    <div class="other">clef-flash: acceptable (0.60)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="89" data-label="acceptable" data-conf="0.8408" data-flag="0">
+  <div class="id">#89</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.84</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Our college fest registration form artifact is live, please test and break it before Friday 🙏</div>
+    <div class="meta">Ishita Banerjee · Share your artifacts · 2026-10-20 16:00 · A 0.94 · T 0.03 · S 0.03</div>
+    <div class="probs"><span class="acceptable" style="width:94.5%" title="acceptable 94.5%"></span><span class="toxic" style="width:2.8%" title="toxic 2.8%"></span><span class="spam" style="width:2.8%" title="spam 2.8%"></span></div>
+    <div class="other">clef-flash: acceptable (0.39)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="90" data-label="acceptable" data-conf="0.8794" data-flag="0">
+  <div class="id">#90</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Found a bug: entering an emoji in the name field crashes the confirmation page. 😅</div>
+    <div class="meta">Riya Thomas · Share your artifacts · 2026-10-20 16:35 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.9%" title="acceptable 95.9%"></span><span class="toxic" style="width:2.3%" title="toxic 2.3%"></span><span class="spam" style="width:1.8%" title="spam 1.8%"></span></div>
+    <div class="other">clef-flash: acceptable (0.59)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="91" data-label="acceptable" data-conf="0.2248" data-flag="1">
+  <div class="id">#91</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf low">conf 0.22</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Who made this garbage form? Typical mechanical branch people trying to code. Stick to your lathe machines 😂</div>
+    <div class="meta">Vikram Singh · Share your artifacts · 2026-10-20 17:02 · A 0.50 · T 0.48 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:50.5%" title="acceptable 50.5%"></span><span class="toxic" style="width:47.8%" title="toxic 47.8%"></span><span class="spam" style="width:1.8%" title="spam 1.8%"></span></div>
+    <div class="other disagree">clef-flash: toxic (0.15)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="92" data-label="acceptable" data-conf="0.9094" data-flag="0">
+  <div class="id">#92</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.91</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Does using AI-generated images in the artifact need attribution too?</div>
+    <div class="meta">Shruti Deshpande · Doubts · 2026-10-21 10:10 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:96.9%" title="acceptable 96.9%"></span><span class="toxic" style="width:1.7%" title="toxic 1.7%"></span><span class="spam" style="width:1.4%" title="spam 1.4%"></span></div>
+    <div class="other">clef-flash: acceptable (0.71)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="93" data-label="acceptable" data-conf="0.8985" data-flag="0">
+  <div class="id">#93</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Will there be a session on how to evaluate AI-generated code for security issues? Seems important for the next assignment.</div>
+    <div class="meta">Siddharth Rao · General · 2026-10-21 11:30 · A 0.97 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.5%" title="acceptable 96.5%"></span><span class="toxic" style="width:1.9%" title="toxic 1.9%"></span><span class="spam" style="width:1.6%" title="spam 1.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.66)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="94" data-label="spam" data-conf="0.8817" data-flag="0">
+  <div class="id">#94</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">CS307 complete solved assignments + viva answers available!! 100% working code. DM on telegram @cs307_solutions_hub. Pay after delivery.</div>
+    <div class="meta">cs307_solutions · General · 2026-10-21 12:00 · A 0.03 · T 0.01 · S 0.96</div>
+    <div class="probs"><span class="acceptable" style="width:2.6%" title="acceptable 2.6%"></span><span class="toxic" style="width:1.4%" title="toxic 1.4%"></span><span class="spam" style="width:95.9%" title="spam 95.9%"></span></div>
+    <div class="other">clef-flash: spam (0.83)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="95" data-label="acceptable" data-conf="0.8982" data-flag="0">
+  <div class="id">#95</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Sir, please consider allowing pair submissions next time, 4-member groups are hard to coordinate.</div>
+    <div class="meta">Ritika Sen · General · 2026-10-21 14:15 · A 0.97 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.5%" title="acceptable 96.5%"></span><span class="toxic" style="width:1.9%" title="toxic 1.9%"></span><span class="spam" style="width:1.5%" title="spam 1.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.63)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="96" data-label="acceptable" data-conf="0.8784" data-flag="0">
+  <div class="id">#96</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.88</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Finally submitted at 11:57 PM 😂 Never doing last-minute again (I say this every semester).</div>
+    <div class="meta">Omkar Jadhav · Submission &amp; grading · 2026-10-21 23:58 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:95.8%" title="acceptable 95.8%"></span><span class="toxic" style="width:2.5%" title="toxic 2.5%"></span><span class="spam" style="width:1.7%" title="spam 1.7%"></span></div>
+    <div class="other">clef-flash: acceptable (0.53)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row toxic" data-id="97" data-label="toxic" data-conf="0.8319" data-flag="0">
+  <div class="id">#97</div>
+  <div>
+    <span class="badge toxic">toxic</span>
+    <div class="conf">conf 0.83</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">If you can&#x27;t even set up an API key you shouldn&#x27;t be in CSE. Stop spamming the forum with your stupid doubts, dumbo.</div>
+    <div class="meta">Rahul Chauhan · Doubts · 2026-10-22 10:05 · A 0.05 · T 0.94 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:4.5%" title="acceptable 4.5%"></span><span class="toxic" style="width:94.1%" title="toxic 94.1%"></span><span class="spam" style="width:1.4%" title="spam 1.4%"></span></div>
+    <div class="other">clef-flash: toxic (0.54)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="98" data-label="acceptable" data-conf="0.8933" data-flag="0">
+  <div class="id">#98</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.89</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Thanks to everyone who answered doubts here, this thread was more useful than the lectures honestly 😄</div>
+    <div class="meta">Divya Hegde · General · 2026-10-22 18:30 · A 0.96 · T 0.02 · S 0.02</div>
+    <div class="probs"><span class="acceptable" style="width:96.3%" title="acceptable 96.3%"></span><span class="toxic" style="width:2.1%" title="toxic 2.1%"></span><span class="spam" style="width:1.6%" title="spam 1.6%"></span></div>
+    <div class="other">clef-flash: acceptable (0.57)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row spam" data-id="99" data-label="spam" data-conf="0.8928" data-flag="0">
+  <div class="id">#99</div>
+  <div>
+    <span class="badge spam">spam</span>
+    <div class="conf">conf 0.89</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Hey guys check out my startup app, we are giving ₹100 Paytm cash for every signup using my referral code RAJU100 😊 Link: refer-n-earn.app/RAJU100</div>
+    <div class="meta">Raju Startup · General · 2026-10-23 12:00 · A 0.02 · T 0.01 · S 0.96</div>
+    <div class="probs"><span class="acceptable" style="width:2.4%" title="acceptable 2.4%"></span><span class="toxic" style="width:1.3%" title="toxic 1.3%"></span><span class="spam" style="width:96.3%" title="spam 96.3%"></span></div>
+    <div class="other">clef-flash: spam (0.77)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row acceptable" data-id="100" data-label="acceptable" data-conf="0.8992" data-flag="0">
+  <div class="id">#100</div>
+  <div>
+    <span class="badge acceptable">acceptable</span>
+    <div class="conf">conf 0.90</div>
+  </div>
+  <div class="text-cell">
+    <div class="text">Ma&#x27;am, any update on when the next assignment will be released? Want to plan around mid-sems.</div>
+    <div class="meta">Shreya Patil · General · 2026-10-25 10:40 · A 0.97 · T 0.02 · S 0.01</div>
+    <div class="probs"><span class="acceptable" style="width:96.5%" title="acceptable 96.5%"></span><span class="toxic" style="width:2.0%" title="toxic 2.0%"></span><span class="spam" style="width:1.5%" title="spam 1.5%"></span></div>
+    <div class="other">clef-flash: acceptable (0.64)</div>
+    
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>
+  </div>
+</div></main>
+<script>
+const rows = [...document.querySelectorAll('.row')];
+let label = 'all', onlyFlagged = false, onlyMarked = false;
+function apply() {
+  const q = document.getElementById('q').value.toLowerCase();
+  let shown = 0;
+  rows.forEach(r => {
+    let ok = true;
+    if (label !== 'all' && r.dataset.label !== label) ok = false;
+    if (onlyFlagged && r.dataset.flag !== '1') ok = false;
+    if (onlyMarked && !r.classList.contains('marked')) ok = false;
+    if (q && !r.textContent.toLowerCase().includes(q)) ok = false;
+    r.style.display = ok ? '' : 'none';
+    if (ok) shown++;
+  });
+  document.getElementById('count').textContent = shown + ' shown';
+}
+document.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => {
+  label = b.dataset.filter;
+  document.querySelectorAll('[data-filter]').forEach(x => x.classList.toggle('on', x === b));
+  apply();
+});
+document.getElementById('flag').onclick = e => {
+  onlyFlagged = !onlyFlagged; e.target.classList.toggle('on', onlyFlagged); apply();
+};
+document.getElementById('q').oninput = apply;
+document.getElementById('sort').onchange = e => {
+  const main = document.querySelector('main');
+  const key = e.target.value;
+  rows.sort((a, b) => {
+    if (key === 'conf') return a.dataset.conf - b.dataset.conf;
+    return a.dataset.id - b.dataset.id;
+  }).forEach(r => main.appendChild(r));
+};
+
+// ---------- MISTAKES.md writer: you mark a row, pick the right label, write why ----------
+const LABELS = ['acceptable', 'toxic', 'spam'];
+const MODEL = document.body.dataset.model;
+const SOURCE = document.body.dataset.source;
+const STORE_KEY = 'clef-mistakes:' + SOURCE;
+let mistakes = loadMistakes();
+let fileHandle = null;
+
+function loadMistakes() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (saved) return saved;
+  } catch (e) {}
+  return {};
+}
+
+function persist() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(mistakes)); } catch (e) {}
+}
+
+function quote(text) {
+  return '> ' + text.trim().split('\n').join('\n> ');
+}
+
+function toMarkdown() {
+  const ids = Object.keys(mistakes).map(Number).sort((a, b) => a - b);
+  let md = '# Clef mistakes\n\n';
+  md += 'Model: `' + MODEL + '` · Data: `' + SOURCE + '` · ';
+  md += ids.length + ' mistakes out of ' + rows.length + ' comments.\n\n';
+  ids.forEach(id => {
+    const m = mistakes[id];
+    md += '## #' + id + '\n\n' + quote(m.text) + '\n\n';
+    md += '- **Clef:** ' + m.clef + ' (confidence ' + m.conf + ')\n';
+    md += '- **Mine:** ' + m.mine + '\n';
+    if (m.borderline) md += '- **Borderline:** yes\n';
+    md += '- **Why:** ' + m.why.trim().replace(/\n+/g, ' ') + '\n\n';
+  });
+  return md;
+}
+
+function setStatus(text) {
+  document.getElementById('save-status').textContent = text;
+}
+
+async function writeToFile() {
+  const md = toMarkdown();
+  if (fileHandle) {
+    const writable = await fileHandle.createWritable();
+    await writable.write(md);
+    await writable.close();
+    setStatus('Saved to ' + fileHandle.name + ' at ' + new Date().toLocaleTimeString());
+    return;
+  }
+  setStatus('Not linked to a file yet. Click "Save MISTAKES.md".');
+}
+
+function downloadFile() {
+  const blob = new Blob([toMarkdown()], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'MISTAKES.md';
+  a.click();
+  setStatus('Downloaded MISTAKES.md. Move it into the repo folder.');
+}
+
+document.getElementById('save-md').onclick = async () => {
+  if (!('showSaveFilePicker' in window)) {
+    downloadFile();
+    return;
+  }
+  try {
+    if (!fileHandle) {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: 'MISTAKES.md',
+        types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+      });
+    }
+    await writeToFile();
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      setStatus('Could not write the file (' + e.message + '). Downloading instead.');
+      downloadFile();
+    }
+  }
+};
+
+function refreshCounts() {
+  const n = Object.keys(mistakes).length;
+  document.getElementById('marked').textContent = '✗ Marked by me (' + n + ')';
+}
+
+function refreshRow(row) {
+  const m = mistakes[row.dataset.id];
+  const btn = row.querySelector('.mark-btn');
+  if (m) {
+    row.classList.add('marked');
+    btn.textContent = '✎ Mistake: Clef ' + m.clef + ' → me ' + m.mine;
+  } else {
+    row.classList.remove('marked');
+    btn.textContent = '✗ Clef is wrong';
+  }
+}
+
+async function changed(row) {
+  persist();
+  refreshRow(row);
+  refreshCounts();
+  if (fileHandle) {
+    try { await writeToFile(); } catch (e) { setStatus('Auto-save failed: ' + e.message); }
+  }
+}
+
+rows.forEach(row => {
+  const id = row.dataset.id;
+  const clef = row.dataset.label;
+  const editor = row.querySelector('.editor');
+  const select = editor.querySelector('select');
+  const borderline = editor.querySelector('input[type=checkbox]');
+  const why = editor.querySelector('textarea');
+
+  LABELS.forEach(l => {
+    if (l === clef) return;
+    const opt = document.createElement('option');
+    opt.value = l;
+    opt.textContent = l;
+    select.appendChild(opt);
+  });
+
+  row.querySelector('.mark-btn').onclick = () => {
+    const m = mistakes[id];
+    if (m) {
+      select.value = m.mine;
+      borderline.checked = m.borderline;
+      why.value = m.why;
+    }
+    editor.classList.toggle('open');
+    if (editor.classList.contains('open')) why.focus();
+  };
+
+  editor.querySelector('.save').onclick = () => {
+    if (!why.value.trim()) {
+      why.focus();
+      why.placeholder = 'Write one or two sentences on why before saving.';
+      return;
+    }
+    mistakes[id] = {
+      text: row.querySelector('.text').textContent,
+      clef: clef,
+      conf: Number(row.dataset.conf).toFixed(2),
+      mine: select.value,
+      borderline: borderline.checked,
+      why: why.value,
+    };
+    editor.classList.remove('open');
+    changed(row);
+  };
+
+  editor.querySelector('.remove').onclick = () => {
+    delete mistakes[id];
+    why.value = '';
+    borderline.checked = false;
+    editor.classList.remove('open');
+    changed(row);
+  };
+
+  refreshRow(row);
+});
+
+document.getElementById('marked').onclick = e => {
+  onlyMarked = !onlyMarked; e.target.classList.toggle('on', onlyMarked); apply();
+};
+
+refreshCounts();
+apply();
+</script>
+</body></html>
