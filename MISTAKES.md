@@ -9,7 +9,7 @@ Model: `clef` · Data: `comments.json` · 2 mistakes out of 100 comments.
 - **Clef:** acceptable (confidence 0.22)
 - **Mine:** toxic
 - **Borderline:** yes
-- **Why:** It's toxic towards the whole side because  some people might cheat in projects.
+- **Why:** Stereotypes an entire group of students as cheaters and frames it as inherent (‘in their blood’); no named target or slur, which is likely why Clef missed it.
 
 ## #91
 
