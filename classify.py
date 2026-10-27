@@ -202,13 +202,28 @@ main { max-width:980px; margin:0 auto; padding:16px 20px 60px; }
 .probs span.spam { background:var(--spam); }
 .other { font-size:12px; margin-top:4px; }
 .other.disagree { color:var(--flag); font-weight:700; }
+.row.marked { outline:2px dashed var(--flag); outline-offset:-2px; }
+.mark-btn { margin-top:8px; border:1px solid var(--line); background:transparent; color:var(--ink);
+  border-radius:6px; padding:3px 10px; font-size:12px; cursor:pointer; }
+.row.marked .mark-btn { border-color:var(--flag); color:var(--flag); font-weight:700; }
+.editor { display:none; margin-top:8px; padding:10px; border:1px solid var(--line); border-radius:8px; }
+.editor.open { display:block; }
+.editor label { font-size:13px; margin-right:12px; }
+.editor select, .editor textarea { background:var(--bg); color:var(--ink); border:1px solid var(--line);
+  border-radius:6px; padding:4px 8px; font:inherit; font-size:13px; }
+.editor textarea { width:100%; min-height:60px; margin-top:8px; }
+.editor .actions { margin-top:8px; display:flex; gap:8px; }
+.editor .actions button { border:1px solid var(--line); background:var(--card); color:var(--ink);
+  border-radius:6px; padding:4px 12px; cursor:pointer; font-size:13px; }
+.editor .actions button.primary { background:var(--flag); color:#fff; border-color:var(--flag); }
+#save-status { font-size:12px; color:var(--muted); }
 @media (max-width:640px) { .row { grid-template-columns:40px 1fr; }
   .row .text-cell { grid-column:1 / -1; } }
 """
 
 JS = """
 const rows = [...document.querySelectorAll('.row')];
-let label = 'all', onlyFlagged = false;
+let label = 'all', onlyFlagged = false, onlyMarked = false;
 function apply() {
   const q = document.getElementById('q').value.toLowerCase();
   let shown = 0;
@@ -216,6 +231,7 @@ function apply() {
     let ok = true;
     if (label !== 'all' && r.dataset.label !== label) ok = false;
     if (onlyFlagged && r.dataset.flag !== '1') ok = false;
+    if (onlyMarked && !r.classList.contains('marked')) ok = false;
     if (q && !r.textContent.toLowerCase().includes(q)) ok = false;
     r.style.display = ok ? '' : 'none';
     if (ok) shown++;
@@ -239,8 +255,194 @@ document.getElementById('sort').onchange = e => {
     return a.dataset.id - b.dataset.id;
   }).forEach(r => main.appendChild(r));
 };
+
+// ---------- MISTAKES.md writer: you mark a row, pick the right label, write why ----------
+const LABELS = ['acceptable', 'toxic', 'spam'];
+const MODEL = document.body.dataset.model;
+const SOURCE = document.body.dataset.source;
+const STORE_KEY = 'clef-mistakes:' + SOURCE;
+let mistakes = loadMistakes();
+let fileHandle = null;
+
+function loadMistakes() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (saved) return saved;
+  } catch (e) {}
+  return {};
+}
+
+function persist() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(mistakes)); } catch (e) {}
+}
+
+function quote(text) {
+  return '> ' + text.trim().split('\\n').join('\\n> ');
+}
+
+function toMarkdown() {
+  const ids = Object.keys(mistakes).map(Number).sort((a, b) => a - b);
+  let md = '# Clef mistakes\\n\\n';
+  md += 'Model: `' + MODEL + '` · Data: `' + SOURCE + '` · ';
+  md += ids.length + ' mistakes out of ' + rows.length + ' comments.\\n\\n';
+  ids.forEach(id => {
+    const m = mistakes[id];
+    md += '## #' + id + '\\n\\n' + quote(m.text) + '\\n\\n';
+    md += '- **Clef:** ' + m.clef + ' (confidence ' + m.conf + ')\\n';
+    md += '- **Mine:** ' + m.mine + '\\n';
+    if (m.borderline) md += '- **Borderline:** yes\\n';
+    md += '- **Why:** ' + m.why.trim().replace(/\\n+/g, ' ') + '\\n\\n';
+  });
+  return md;
+}
+
+function setStatus(text) {
+  document.getElementById('save-status').textContent = text;
+}
+
+async function writeToFile() {
+  const md = toMarkdown();
+  if (fileHandle) {
+    const writable = await fileHandle.createWritable();
+    await writable.write(md);
+    await writable.close();
+    setStatus('Saved to ' + fileHandle.name + ' at ' + new Date().toLocaleTimeString());
+    return;
+  }
+  setStatus('Not linked to a file yet. Click "Save MISTAKES.md".');
+}
+
+function downloadFile() {
+  const blob = new Blob([toMarkdown()], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'MISTAKES.md';
+  a.click();
+  setStatus('Downloaded MISTAKES.md. Move it into the repo folder.');
+}
+
+document.getElementById('save-md').onclick = async () => {
+  if (!('showSaveFilePicker' in window)) {
+    downloadFile();
+    return;
+  }
+  try {
+    if (!fileHandle) {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: 'MISTAKES.md',
+        types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+      });
+    }
+    await writeToFile();
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      setStatus('Could not write the file (' + e.message + '). Downloading instead.');
+      downloadFile();
+    }
+  }
+};
+
+function refreshCounts() {
+  const n = Object.keys(mistakes).length;
+  document.getElementById('marked').textContent = '✗ Marked by me (' + n + ')';
+}
+
+function refreshRow(row) {
+  const m = mistakes[row.dataset.id];
+  const btn = row.querySelector('.mark-btn');
+  if (m) {
+    row.classList.add('marked');
+    btn.textContent = '✎ Mistake: Clef ' + m.clef + ' → me ' + m.mine;
+  } else {
+    row.classList.remove('marked');
+    btn.textContent = '✗ Clef is wrong';
+  }
+}
+
+async function changed(row) {
+  persist();
+  refreshRow(row);
+  refreshCounts();
+  if (fileHandle) {
+    try { await writeToFile(); } catch (e) { setStatus('Auto-save failed: ' + e.message); }
+  }
+}
+
+rows.forEach(row => {
+  const id = row.dataset.id;
+  const clef = row.dataset.label;
+  const editor = row.querySelector('.editor');
+  const select = editor.querySelector('select');
+  const borderline = editor.querySelector('input[type=checkbox]');
+  const why = editor.querySelector('textarea');
+
+  LABELS.forEach(l => {
+    if (l === clef) return;
+    const opt = document.createElement('option');
+    opt.value = l;
+    opt.textContent = l;
+    select.appendChild(opt);
+  });
+
+  row.querySelector('.mark-btn').onclick = () => {
+    const m = mistakes[id];
+    if (m) {
+      select.value = m.mine;
+      borderline.checked = m.borderline;
+      why.value = m.why;
+    }
+    editor.classList.toggle('open');
+    if (editor.classList.contains('open')) why.focus();
+  };
+
+  editor.querySelector('.save').onclick = () => {
+    if (!why.value.trim()) {
+      why.focus();
+      why.placeholder = 'Write one or two sentences on why before saving.';
+      return;
+    }
+    mistakes[id] = {
+      text: row.querySelector('.text').textContent,
+      clef: clef,
+      conf: Number(row.dataset.conf).toFixed(2),
+      mine: select.value,
+      borderline: borderline.checked,
+      why: why.value,
+    };
+    editor.classList.remove('open');
+    changed(row);
+  };
+
+  editor.querySelector('.remove').onclick = () => {
+    delete mistakes[id];
+    why.value = '';
+    borderline.checked = false;
+    editor.classList.remove('open');
+    changed(row);
+  };
+
+  refreshRow(row);
+});
+
+document.getElementById('marked').onclick = e => {
+  onlyMarked = !onlyMarked; e.target.classList.toggle('on', onlyMarked); apply();
+};
+
+refreshCounts();
 apply();
 """
+
+EDITOR_HTML = """
+    <button class="mark-btn" type="button">✗ Clef is wrong</button>
+    <div class="editor">
+      <label>Right label: <select></select></label>
+      <label><input type="checkbox"> Borderline</label>
+      <textarea placeholder="Why is Clef wrong? One or two sentences. If borderline, explain your choice."></textarea>
+      <div class="actions">
+        <button class="save primary" type="button">Save</button>
+        <button class="remove" type="button">Remove</button>
+      </div>
+    </div>"""
 
 
 def esc(value):
@@ -262,7 +464,7 @@ def prob_text(probabilities):
     return " · ".join(parts)
 
 
-def render_html(data, comments, model, results, second_model, second_results):
+def render_html(data, source, comments, model, results, second_model, second_results):
     counts = {label: 0 for label in LABELS}
     flagged = 0
     rows = []
@@ -304,6 +506,7 @@ def render_html(data, comments, model, results, second_model, second_results):
     <div class="meta">{esc(c.get('author', ''))} · {esc(c.get('thread', ''))} · {esc(c.get('posted_at', ''))} · {prob_text(r['probabilities'])}</div>
     {prob_bar(r['probabilities'])}
     {other_html}
+    {EDITOR_HTML}
   </div>
 </div>""")
 
@@ -318,7 +521,7 @@ def render_html(data, comments, model, results, second_model, second_results):
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Clef moderation report</title><style>{CSS}</style></head>
-<body>
+<body data-model="{esc(model)}" data-source="{esc(source)}">
 <header>
   <h1>{title}</h1>
   <div class="sub">{esc(data.get('course', ''))} · model <b>{esc(model)}</b> · {len(comments)} comments · {summary} · {flagged} flagged for review ({flag_hint})</div>
@@ -331,6 +534,11 @@ def render_html(data, comments, model, results, second_model, second_results):
     <select id="sort"><option value="id">Sort by id</option><option value="conf">Lowest confidence first</option></select>
     <input id="q" placeholder="Search text…">
     <span class="sub" id="count"></span>
+  </div>
+  <div class="bar">
+    <button id="marked">✗ Marked by me (0)</button>
+    <button id="save-md">💾 Save MISTAKES.md</button>
+    <span id="save-status">Pick MISTAKES.md in your repo folder once; after that every change auto-saves.</span>
   </div>
 </header>
 <main>{''.join(rows)}</main>
@@ -370,7 +578,7 @@ def main():
         second_results = classify_all(comments, forum, second_model,
                                       f"results/{stem}.{second_model}.json", args.refresh)
 
-    page = render_html(data, comments, args.model, results, second_model, second_results)
+    page = render_html(data, os.path.basename(args.input), comments, args.model, results, second_model, second_results)
     with open(output, "w", encoding="utf-8") as f:
         f.write(page)
     print(f"Wrote {output}")
