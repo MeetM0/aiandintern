@@ -9,7 +9,7 @@ Model: `clef` · Data: `comments-v2.json` · 6 mistakes out of 100 comments.
 - **Clef:** toxic (confidence 0.23)
 - **Mine:** acceptable
 - **Borderline:** yes
-- **Why:** I don't think this is toxic. He's just being accountable for his mistake and expressing frustration with himself.
+- **Why:** I don't think this is toxic. He's just being accountable for his mistake and expressing frustration with himself. Borderline because it is self-deprecating.
 
 ## #20
 
