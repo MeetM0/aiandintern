@@ -50,6 +50,9 @@ CRITERIA = {
         "(another student, a TA, the instructor), including slurs, body-shaming, "
         "casteist, communal, sexist or homophobic remarks, abusive language aimed at "
         "someone (in English, Hindi or Hinglish), doxxing, or encouraging self-harm. "
+        "Also toxic: stereotyping or mocking a whole group of students (a branch, hostel, "
+        "batch, region, language, gender, caste or community), even when no one is named "
+        "and even when said as a joke. "
         "Criticism of ideas or the course without a personal attack is not toxic."
     ),
     "spam": (
@@ -261,6 +264,8 @@ const LABELS = ['acceptable', 'toxic', 'spam'];
 const MODEL = document.body.dataset.model;
 const SOURCE = document.body.dataset.source;
 const STORE_KEY = 'clef-mistakes:' + SOURCE;
+// comments.json -> MISTAKES.md, comments-v2.json -> MISTAKES-v2.md
+const MD_NAME = 'MISTAKES' + SOURCE.replace(/^comments/, '').replace(/\\.json$/, '') + '.md';
 let mistakes = loadMistakes();
 let fileHandle = null;
 
@@ -309,16 +314,16 @@ async function writeToFile() {
     setStatus('Saved to ' + fileHandle.name + ' at ' + new Date().toLocaleTimeString());
     return;
   }
-  setStatus('Not linked to a file yet. Click "Save MISTAKES.md".');
+  setStatus('Not linked to a file yet. Click "Save ' + MD_NAME + '".');
 }
 
 function downloadFile() {
   const blob = new Blob([toMarkdown()], { type: 'text/markdown' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'MISTAKES.md';
+  a.download = MD_NAME;
   a.click();
-  setStatus('Downloaded MISTAKES.md. Move it into the repo folder.');
+  setStatus('Downloaded ' + MD_NAME + '. Move it into the repo folder.');
 }
 
 document.getElementById('save-md').onclick = async () => {
@@ -329,7 +334,7 @@ document.getElementById('save-md').onclick = async () => {
   try {
     if (!fileHandle) {
       fileHandle = await window.showSaveFilePicker({
-        suggestedName: 'MISTAKES.md',
+        suggestedName: MD_NAME,
         types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
       });
     }
@@ -514,6 +519,7 @@ def render_html(data, source, comments, model, results, second_model, second_res
     if second_results is not None:
         flag_hint += f" or {esc(model)} and {esc(second_model)} disagree"
 
+    md_name = "MISTAKES" + source.replace("comments", "", 1).replace(".json", "") + ".md"
     summary = " · ".join(f"{counts[label]} {label}" for label in LABELS)
     title = f"Clef moderation — {esc(data.get('forum', ''))}"
 
@@ -537,8 +543,8 @@ def render_html(data, source, comments, model, results, second_model, second_res
   </div>
   <div class="bar">
     <button id="marked">✗ Marked by me (0)</button>
-    <button id="save-md">💾 Save MISTAKES.md</button>
-    <span id="save-status">Pick MISTAKES.md in your repo folder once; after that every change auto-saves.</span>
+    <button id="save-md">💾 Save {md_name}</button>
+    <span id="save-status">Pick {md_name} in your repo folder once; after that every change auto-saves.</span>
   </div>
 </header>
 <main>{''.join(rows)}</main>
