@@ -38,3 +38,14 @@ API answers are cached in `results/`, so re-running only rebuilds the HTML. `--r
   confidence (0.22), so the confidence score was a useful pointer to what needed a human look.
 - Next I would add "stereotyping or mocking a group (branch, hostel, region)" explicitly
   to the toxic criteria and re-run to see whether Clef catches these.
+
+## Second run (comments-v2.json, `clef` model)
+
+- Command: `python classify.py --input comments-v2.json --output results-v2.html`
+- Before this run I added group stereotyping to the toxic criteria, because both v1 mistakes were of that kind; Claude made the code change.
+- Clef labelled 71 acceptable, 14 toxic and 15 spam. I found 6 mistakes (see `MISTAKES-v2.md`):
+  - **Harsh words that hurt no one were called toxic:** a student mocking himself (#7, borderline) and a student reporting an incident (#20).
+  - **Targeted sarcasm was missed:** mockery of a named classmate passed as acceptable (#42, #91).
+  - **Spam judged by surface cues, not intent:** a phishing "verify your Moodle account" post passed as acceptable (#40), while a genuine optional workshop announcement with a forms link was called spam because it said "URGENT" (#62).
+- All 6 had confidence 0.55 or lower, so the low-confidence filter again pointed at the right places, though 3 of them (#20, #42, #91) were just above my 0.5 flag line.
+- The checking of Clef's labels in `MISTAKES-v2.md` is my own work.
